@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:thelgcontroller/commands.dart';
+import 'package:pipo_controller/commands.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

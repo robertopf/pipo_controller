@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:thelgcontroller/webos_service.dart';
+import 'package:pipo_controller/webos_service.dart';
 import 'dart:async';
 
 import 'commands.dart';

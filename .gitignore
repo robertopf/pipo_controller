@@ -50,5 +50,6 @@ app.*.map.json
 # Windows
 Thumbs.db
 
-# Android local config (NÃO versionar)
+# Android local config
 android/local.properties
+android/.kotlin/
