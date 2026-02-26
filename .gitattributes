@@ -1,0 +1,6 @@
+# Ignore platform folders for language stats
+android/** linguist-vendored
+ios/** linguist-vendored
+macos/** linguist-vendored
+windows/** linguist-vendored
+linux/** linguist-vendored

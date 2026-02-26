@@ -1,0 +1,40 @@
+name: thelgcontroller
+description: "Flutter project to control LG WebOs TV"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.2.2
+  web_socket_channel: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/pipo_controller.png"
+
+flutter_native_splash:
+  color: "#0F1115"
+  image: assets/splash_logo.png
+  android: true
+  ios: false
+  android_12:
+    image: assets/splash_logo.png
+    icon_background_color: "#0F1115"
