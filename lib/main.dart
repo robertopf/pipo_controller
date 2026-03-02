@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pipo_controller/webos_service.dart';
 import 'dart:async';
+import 'package:flutter/services.dart';
 
 import 'commands.dart';
 
@@ -42,7 +43,8 @@ class RemoteScreen extends StatefulWidget {
   State<RemoteScreen> createState() => _RemoteScreenState();
 }
 
-class _RemoteScreenState extends State<RemoteScreen> {
+class _RemoteScreenState extends State<RemoteScreen>
+    with WidgetsBindingObserver {
   final WebOSService _service = WebOSService();
   bool _isConnected = false;
   final TextEditingController _ipController = TextEditingController();
@@ -52,6 +54,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     _service.onConnectionChanged = (state) {
       setState(() {
@@ -69,6 +73,42 @@ class _RemoteScreenState extends State<RemoteScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSettings();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print("Lifecycle: $state");
+
+    if (state == AppLifecycleState.resumed) {
+      _reconnectIfNeeded();
+    }
+  }
+
+  Future<bool> _onBackPressed() async {
+    SystemNavigator.pop();
+    return false;
+  }
+
+  void _handleBack() {
+    SystemNavigator.pop();
+  }
+
+  Future<void> _reconnectIfNeeded() async {
+    if (_isConnected) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastIp = prefs.getString('last_ip');
+
+    if (lastIp != null) {
+      print("Reconnecting automatically...");
+      _service.connect(lastIp);
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -100,68 +140,76 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Controller'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(_isConnected ? Icons.link : Icons.link_off,
-                color: _isConnected ? Colors.green : Colors.red),
-            onPressed: _showSettings,
-          ),
-        ],
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_status, style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 30),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _btn(Icons.power_settings_new, Colors.red, () => _service.send(Commands.turnOff)),
-                  _btn(Icons.arrow_back, Colors.grey[800]!, () =>  _service.sendPointer("BACK")),
-                ],
-              ),
-
-              const SizedBox(height: 40),
-              _buildDPad(),
-              const SizedBox(height: 40),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _rocker("VOL", Icons.add, Icons.remove,
-                          () => _service.send(Commands.volumeUp),
-                          () => _service.send(Commands.volumeDown)),
-                  _btn(Icons.home, const Color(0xFFA50034), () => openHome()),
-                  _rocker("CH", Icons.keyboard_arrow_up, Icons.keyboard_arrow_down,
-                          () => _service.send(Commands.channelUp),
-                          () => _service.send(Commands.channelDown)),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _btn(
-                      _isMuted ? Icons.volume_off : Icons.volume_up,
-                      _isMuted ? Colors.red : Colors.grey[800]!,
-                      _toggleMute
-                  ),
-                  _btn(Icons.exit_to_app, Colors.grey[800]!, () => _service.sendPointer("EXIT")),
-                ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _handleBack();
+        }
+      },
+      child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Controller'),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: Icon(_isConnected ? Icons.link : Icons.link_off,
+                    color: _isConnected ? Colors.green : Colors.red),
+                onPressed: _showSettings,
               ),
             ],
           ),
+          body: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_status, style: TextStyle(color: _isConnected ? Colors.green : Colors.red)),
+                  const SizedBox(height: 30),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _btn(Icons.power_settings_new, Colors.red, () => _service.send(Commands.turnOff)),
+                      _btn(Icons.arrow_back, Colors.grey[800]!, () =>  _service.sendPointer("BACK")),
+                    ],
+                  ),
+
+                  const SizedBox(height: 40),
+                  _buildDPad(),
+                  const SizedBox(height: 40),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _rocker("VOL", Icons.add, Icons.remove,
+                              () => _service.send(Commands.volumeUp),
+                              () => _service.send(Commands.volumeDown)),
+                      _btn(Icons.home, const Color(0xFFA50034), () => openHome()),
+                      _rocker("CH", Icons.keyboard_arrow_up, Icons.keyboard_arrow_down,
+                              () => _service.send(Commands.channelUp),
+                              () => _service.send(Commands.channelDown)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _btn(
+                          _isMuted ? Icons.volume_off : Icons.volume_up,
+                          _isMuted ? Colors.red : Colors.grey[800]!,
+                          _toggleMute
+                      ),
+                      _btn(Icons.exit_to_app, Colors.grey[800]!, () => _service.sendPointer("EXIT")),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
     );
   }
 
