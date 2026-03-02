@@ -10,11 +10,11 @@ void main() async {
 
   await Future.delayed(const Duration(seconds: 1));
 
-  runApp(const LGControllerApp());
+  runApp(const PipoControllerApp());
 }
 
-class LGControllerApp extends StatelessWidget {
-  const LGControllerApp({super.key});
+class PipoControllerApp extends StatelessWidget {
+  const PipoControllerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +66,9 @@ class _RemoteScreenState extends State<RemoteScreen> {
       });
     };
 
-    _loadSettings();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSettings();
+    });
   }
 
   Future<void> _loadSettings() async {
