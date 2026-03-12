@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pipo_controller/webos_discovery.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pipo_controller/webos_service.dart';
 import 'dart:async';
@@ -8,6 +9,11 @@ import 'commands.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final discovery = WebOSDiscovery();
+
+  final devices = await discovery.discover();
+
+  print("Found: $devices");
 
   await Future.delayed(const Duration(seconds: 1));
 
@@ -50,6 +56,8 @@ class _RemoteScreenState extends State<RemoteScreen>
   final TextEditingController _ipController = TextEditingController();
   String _status = "Disconnected";
   bool _isMuted = false;
+  Timer? _holdTimer;
+  DateTime? _holdStart;
 
   @override
   void initState() {
@@ -78,6 +86,7 @@ class _RemoteScreenState extends State<RemoteScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _holdTimer?.cancel();
     super.dispose();
   }
 
@@ -138,6 +147,50 @@ class _RemoteScreenState extends State<RemoteScreen>
     setState(() {});
   }
 
+  void _hapticTick() {
+    HapticFeedback.vibrate();
+  }
+
+  Duration _currentRepeatDelay() {
+    final heldMs = DateTime.now().difference(_holdStart!).inMilliseconds;
+
+    if (heldMs < 300) {
+      return const Duration(milliseconds: 220); // low start
+    } else if (heldMs < 1000) {
+      return const Duration(milliseconds: 140); // medium progress
+    } else {
+      return const Duration(milliseconds: 70); // fast progress
+    }
+  }
+
+  void _startHold(VoidCallback action) {
+    _holdStart = DateTime.now();
+
+    action();
+    _hapticTick();
+
+    void scheduleNext() {
+      _holdTimer = Timer(_currentRepeatDelay(), () {
+        action();
+        _hapticTick();
+        scheduleNext();
+      });
+    }
+
+    scheduleNext();
+  }
+
+  void _simpleClick(VoidCallback action) {
+    action();
+    _hapticTick();
+  }
+
+  void _stopHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _holdStart = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -166,19 +219,23 @@ class _RemoteScreenState extends State<RemoteScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(_status, style: TextStyle(color: _isConnected ? Colors.green : Colors.red)),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 10),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _btn(Icons.power_settings_new, Colors.red, () => _service.send(Commands.turnOff)),
-                      _btn(Icons.arrow_back, Colors.grey[800]!, () =>  _service.sendPointer("BACK")),
+                      _btn(Icons.power_settings_new, Colors.red,
+                              () => _service.send(Commands.turnOff),
+                          size: 30,
+                          padding: const EdgeInsets.all(10),
+                          enableHold: false),
+                      const SizedBox(width: 140), // Placeholder to keep layout balanced
                     ],
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
                   _buildDPad(),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 10),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -186,23 +243,33 @@ class _RemoteScreenState extends State<RemoteScreen>
                       _rocker("VOL", Icons.add, Icons.remove,
                               () => _service.send(Commands.volumeUp),
                               () => _service.send(Commands.volumeDown)),
-                      _btn(Icons.home, const Color(0xFFA50034), () => openHome()),
+                      _btn(
+                          _isMuted ? Icons.volume_off : Icons.volume_up,
+                          _isMuted ? Colors.red : Colors.grey[800]!,
+                          size: 30,
+                          padding: const EdgeInsets.all(10),
+                          _toggleMute,
+                          enableHold: false
+                      ),
                       _rocker("CH", Icons.keyboard_arrow_up, Icons.keyboard_arrow_down,
                               () => _service.send(Commands.channelUp),
                               () => _service.send(Commands.channelDown)),
                     ],
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 15),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _btn(
-                          _isMuted ? Icons.volume_off : Icons.volume_up,
-                          _isMuted ? Colors.red : Colors.grey[800]!,
-                          _toggleMute
-                      ),
-                      _btn(Icons.exit_to_app, Colors.grey[800]!, () => _service.sendPointer("EXIT")),
+                      _btn(Icons.home, const Color(0xFFA50034),
+                              () => openHome(), size: 25,
+                              padding: const EdgeInsets.all(10),
+                              enableHold: false),
+                      _btn(Icons.exit_to_app, Colors.grey[800]!,
+                              () => _service.sendPointer("EXIT"),
+                              size: 25,
+                              padding: const EdgeInsets.all(10),
+                              enableHold: false),
                     ],
                   ),
                 ],
@@ -226,14 +293,21 @@ class _RemoteScreenState extends State<RemoteScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey[850],
                   padding: EdgeInsets.zero,
-                  textStyle: const TextStyle(fontSize: 10),
+                  textStyle: const TextStyle(fontSize: 12),
                 ),
                 child: const Text("RECENTS"),
               ),
             ),
             const SizedBox(width: 20),
             _btn(Icons.keyboard_arrow_up, Colors.grey[900]!, () => _service.sendPointer("UP")),
-            const SizedBox(width: 100), // Placeholder to keep layout balanced
+            const SizedBox(width: 20),
+            _btn(Icons.arrow_back, Colors.grey[800]!, () =>  _service.sendPointer("BACK"), enableHold: false),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20)
           ],
         ),
         Row(
@@ -241,9 +315,15 @@ class _RemoteScreenState extends State<RemoteScreen>
           children: [
             _btn(Icons.keyboard_arrow_left, Colors.grey[900]!, () => _service.sendPointer("LEFT")),
             const SizedBox(width: 20),
-            _btn(Icons.circle, Colors.grey[800]!, () => _service.sendPointer("ENTER")),
+            _btn(Icons.circle, Colors.grey[800]!, () => _service.sendPointer("ENTER"), enableHold: false),
             const SizedBox(width: 20),
             _btn(Icons.keyboard_arrow_right, Colors.grey[900]!, () => _service.sendPointer("RIGHT")),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20)
           ],
         ),
         _btn(Icons.keyboard_arrow_down, Colors.grey[900]!, () => _service.sendPointer("DOWN")),
@@ -251,34 +331,79 @@ class _RemoteScreenState extends State<RemoteScreen>
     );
   }
 
-  Widget _btn(IconData icon, Color color, VoidCallback onTap) {
+  Widget _btn(
+      IconData icon,
+      Color color,
+      VoidCallback onTap, {
+        bool enableHold = true,
+        double size = 30,
+        EdgeInsets padding = const EdgeInsets.all(16),
+        ShapeBorder shape = const CircleBorder(),
+      }) {
     return Material(
       color: color,
-      shape: const CircleBorder(),
+      shape: shape,
       elevation: 4,
       child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
+        customBorder: shape,
+
+        onTap: !enableHold ? () => _simpleClick(onTap) : null,
+
+        onTapDown: enableHold ? (_) => _startHold(onTap) : null,
+        onTapUp: enableHold ? (_) => _stopHold() : null,
+        onTapCancel: enableHold ? _stopHold : null,
+
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Icon(icon, color: Colors.white, size: 30),
+          padding: padding,
+          child: Icon(icon, color: Colors.white, size: size),
         ),
       ),
     );
   }
 
-  Widget _rocker(String label, IconData up, IconData down, VoidCallback onUp, VoidCallback onDown) {
+  Widget _rocker(
+      String label,
+      IconData up,
+      IconData down,
+      VoidCallback onUp,
+      VoidCallback onDown,
+      ) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(
+                color: Colors.white54, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Container(
-          decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(30)),
+          height: 130,
+          width: 60,
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(30),
+          ),
           child: Column(
             children: [
-              IconButton(onPressed: onUp, icon: Icon(up, color: Colors.white)),
-              const SizedBox(height: 5, child: Divider(color: Colors.white10)),
-              IconButton(onPressed: onDown, icon: Icon(down, color: Colors.white)),
+              Expanded(
+                child: GestureDetector(
+                  onTapDown: (_) => _startHold(onUp),
+                  onTapUp: (_) => _stopHold(),
+                  onTapCancel: _stopHold,
+                  child: const Center(
+                    child: Icon(Icons.add, color: Colors.white),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, color: Colors.white12),
+              Expanded(
+                child: GestureDetector(
+                  onTapDown: (_) => _startHold(onDown),
+                  onTapUp: (_) => _stopHold(),
+                  onTapCancel: _stopHold,
+                  child: const Center(
+                    child: Icon(Icons.remove, color: Colors.white),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
