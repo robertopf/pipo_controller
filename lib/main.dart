@@ -286,10 +286,11 @@ class _RemoteScreenState extends State<RemoteScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+
             SizedBox(
               width: 80,
               child: ElevatedButton(
-                onPressed: openHome,
+                onPressed: () => _simpleClick(() => _service.sendPointer("HOME")),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey[850],
                   padding: EdgeInsets.zero,
@@ -298,10 +299,29 @@ class _RemoteScreenState extends State<RemoteScreen>
                 child: const Text("RECENTS"),
               ),
             ),
+
             const SizedBox(width: 20),
-            _btn(Icons.keyboard_arrow_up, Colors.grey[900]!, () => _service.sendPointer("UP")),
+
+            _btn(
+              Icons.keyboard_arrow_up,
+              Colors.grey[900]!,
+                  () => _service.sendPointer("UP"),
+            ),
+
             const SizedBox(width: 20),
-            _btn(Icons.arrow_back, Colors.grey[800]!, () =>  _service.sendPointer("BACK"), enableHold: false),
+
+            SizedBox(
+              width: 80,
+              child: Center(
+                child: _btn(
+                  Icons.arrow_back,
+                  Colors.grey[800]!,
+                      () => _service.sendPointer("BACK"),
+                    enableHold: false,
+                    iconColor: Colors.red[300]!,
+                ),
+              ),
+            ),
           ],
         ),
         Row(
@@ -339,6 +359,7 @@ class _RemoteScreenState extends State<RemoteScreen>
         double size = 30,
         EdgeInsets padding = const EdgeInsets.all(16),
         ShapeBorder shape = const CircleBorder(),
+        Color iconColor = Colors.white,
       }) {
     return Material(
       color: color,
@@ -355,7 +376,7 @@ class _RemoteScreenState extends State<RemoteScreen>
 
         child: Padding(
           padding: padding,
-          child: Icon(icon, color: Colors.white, size: size),
+          child: Icon(icon, color: iconColor, size: size),
         ),
       ),
     );
