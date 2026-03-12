@@ -46,7 +46,7 @@ So I decided to build my own — and use it as an opportunity to learn Flutter
 🚀 Option 1 — Run from Source (Developer)
 
 - Clone the repository: 
-  - git clone https://github.com/YOUR_USERNAME/pipo-controller.git
+  - git clone https://github.com/robertopf/pipo_controller.git
   - cd pipo-controller
 
 - Install dependencies:
